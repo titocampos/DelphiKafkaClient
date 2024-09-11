@@ -7,21 +7,11 @@ unit Kafka.Lib;
 interface
 
 uses
-  System.Types;
+  CRM.Types, Types;
 
 const
-  {$IF Defined(WIN32)}
-  Lib = 'librdkafka.dll';
+  Lib = 'rdkafka.dll';
   _PU = '';
-  {$ELSEIF Defined(WIN64)}
-  Lib = 'librdkafka.dll';
-  _PU = '';
-  {$ELSEIF Defined(LINUX)}
-  Lib = 'librdkafka.so';
-  _PU = '';
-  {$ELSE}
-    {$MESSAGE Error 'Unsupported platform'}
-  {$ENDIF}
 
 const
   { TODO : Macro refers to system symbol "__inline": }
@@ -566,7 +556,7 @@ type
     case integer of
       0: (S_un_b: SunB);
       1: (S_un_w: SunW);
-      2: (S_addr: System.Types.DWORD);
+      2: (S_addr: Types.DWORD);
   end;
   PInAddr = ^TInAddr;
 
@@ -735,6 +725,8 @@ type
   rd_kafka_message_t = rd_kafka_message_s;
   Prd_kafka_message_t = ^rd_kafka_message_t;
   PPrd_kafka_message_t = ^Prd_kafka_message_t;
+
+  TArrayrd_kafka_message_t = array of rd_kafka_message_t;
 
   (**
    * @enum rd_kafka_msg_status_t

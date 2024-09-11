@@ -1,0 +1,15 @@
+program Demo2007;
+
+uses
+  Forms,
+  uMain in 'uMain.pas' {Form4},
+  CRM.Types in '..\src\CRM.Types.pas';
+
+{$R *.res}
+
+begin
+  Application.Initialize;
+  Application.MainFormOnTaskbar := True;
+  Application.CreateForm(TForm4, Form4);
+  Application.Run;
+end.

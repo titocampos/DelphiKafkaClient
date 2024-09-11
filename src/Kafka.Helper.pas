@@ -3,82 +3,77 @@ unit Kafka.Helper;
 interface
 
 uses
-  System.SysUtils, System.Classes, System.Diagnostics, System.DateUtils,
-
-  Kafka.Types,
-  Kafka.Lib;
+  CRM.Types, CRMStopWatch, SysUtils, Classes, DateUtils, SyncObjs, Kafka.Types, Kafka.Lib;
 
 type
   EKafkaError = class(Exception);
 
   TOnLog = procedure(const Values: TStrings) of object;
 
-  TOperationTimer = record
+  TOperationTimer = class
   private
-    FStopwatch: TStopwatch;
+    FStopwatch: TCRMStopWatch;
     FOperation: String;
   public
     constructor Create(const Operation: String); overload;
     constructor Create(const Operation: String; Args: Array of const); overload;
-
+    destructor Destroy; override;
     procedure Start(const Operation: String); overload;
     procedure Start(const Operation: String; Args: Array of const); overload;
-
     procedure Stop;
-
-    class operator Finalize(var ADest: TOperationTimer);
+    class procedure Finalize(var ADest: TOperationTimer);
   end;
 
   TKafkaUtils = class
   public
-    class function PointerToStr(const Value: Pointer; const Len: Integer; const Encoding: TEncoding): String; static;
+    class function PointerToStr(const Value: Pointer; const Len: Integer): String; static;
     class function PointerToBytes(const Value: Pointer; const Len: Integer): TBytes; static;
-    class function StrToBytes(const Value: String; const Encoding: TEncoding): TBytes; static;
-    class procedure StringsToConfigArrays(const Values: TStrings; out NameArr, ValueArr: TArray<String>); static;
-    class function StringsToIntegerArray(const Value: String): TArray<Integer>;
+    class function StrToBytes(const Value: String): TBytes; static;
+    class procedure StringsToConfigArrays(const Values: TStrings; out NameArr, ValueArr: TStringArray); static;
+    class function StringsToIntegerArray(const Value: String): TIntegerArray;
     class function DateTimeToStrMS(const Value: TDateTime): String; static;
   end;
 
   TKafkaHelper = class
   private
     class var FLogStrings: TStringList;
+    class var FCriticalSection: TCriticalSection;
     class var FOnLog: TOnLog;
-    class procedure CheckKeyValues(const Keys, Values: TArray<String>); static;
+
+    class procedure CheckKeyValues(const Keys, Values: TStringArray); static;
   protected
     class procedure DoLog(const Text: String; const LogType: TKafkaLogType);
   public
-    class constructor Create;
-    class destructor Destroy;
+    class procedure Initialize;
+    class procedure Finalize;
 
     class procedure Log(const Text: String; const LogType: TKafkaLogType);
 
     // Wrappers
     class function NewConfiguration(const DefaultCallBacks: Boolean = True): prd_kafka_conf_t; overload; static;
-    class function NewConfiguration(const Keys, Values: TArray<String>; const DefaultCallBacks: Boolean = True): prd_kafka_conf_t; overload; static;
+    class function NewConfiguration(const Keys, Values: TStringArray; const DefaultCallBacks: Boolean = True): prd_kafka_conf_t; overload; static;
     class procedure SetConfigurationValue(var Configuration: prd_kafka_conf_t; const Key, Value: String); static;
     class procedure DestroyConfiguration(const Configuration: Prd_kafka_conf_t); static;
 
     class function NewTopicConfiguration: prd_kafka_topic_conf_t; overload; static;
-    class function NewTopicConfiguration(const Keys, Values: TArray<String>): prd_kafka_topic_conf_t; overload; static;
+    class function NewTopicConfiguration(const Keys, Values: TStringArray): prd_kafka_topic_conf_t; overload; static;
     class procedure SetTopicConfigurationValue(var TopicConfiguration: prd_kafka_topic_conf_t; const Key, Value: String); static;
     class procedure DestroyTopicConfiguration(const TopicConfiguration: Prd_kafka_topic_conf_t); static;
 
     class function NewProducer(const Configuration: prd_kafka_conf_t): prd_kafka_t; overload; static;
-    class function NewProducer(const ConfigKeys, ConfigValues: TArray<String>): prd_kafka_t; overload; static;
+    class function NewProducer(const ConfigKeys, ConfigValues: TStringArray): prd_kafka_t; overload; static;
 
     class function NewConsumer(const Configuration: prd_kafka_conf_t): prd_kafka_t; overload; static;
 
     class procedure ConsumerClose(const KafkaHandle: prd_kafka_t); static;
     class procedure DestroyHandle(const KafkaHandle: prd_kafka_t); static;
 
-    class function NewTopic(const KafkaHandle: prd_kafka_t; const TopicName: String; const TopicConfiguration: prd_kafka_topic_conf_t = nil): prd_kafka_topic_t;
+    class function NewTopic(const KafkaHandle: prd_kafka_t; const TopicName: UTF8String; const TopicConfiguration: prd_kafka_topic_conf_t = nil): prd_kafka_topic_t;
 
     class function Produce(const Topic: prd_kafka_topic_t; const Payload: Pointer; const PayloadLength: NativeUInt; const Key: Pointer = nil; const KeyLen: NativeUInt = 0; const Partition: Int32 = RD_KAFKA_PARTITION_UA; const MsgFlags: Integer = RD_KAFKA_MSG_F_COPY; const MsgOpaque: Pointer = nil): Integer; overload;
-    class function Produce(const Topic: prd_kafka_topic_t; const Payloads: TArray<Pointer>; const PayloadLengths: TArray<Integer>; const Key: Pointer = nil; const KeyLen: NativeUInt = 0; const Partition: Int32 = RD_KAFKA_PARTITION_UA; const MsgFlags: Integer = RD_KAFKA_MSG_F_COPY; const MsgOpaque: Pointer = nil): Integer; overload;
+    class function Produce(const Topic: prd_kafka_topic_t; const Payloads: TPointerArray; const PayloadLengths: TIntegerArray; const Key: Pointer = nil; const KeyLen: NativeUInt = 0; const Partition: Int32 = RD_KAFKA_PARTITION_UA; const MsgFlags: Integer = RD_KAFKA_MSG_F_COPY; const MsgOpaque: Pointer = nil): Integer; overload;
     class function Produce(const Topic: prd_kafka_topic_t; const Payload: String; const Key: String; const Partition: Int32 = RD_KAFKA_PARTITION_UA; const MsgFlags: Integer = RD_KAFKA_MSG_F_COPY; const MsgOpaque: Pointer = nil): Integer; overload;
-    class function Produce(const Topic: prd_kafka_topic_t; const Payload: String; const Key: String; const Encoding: TEncoding; const Partition: Int32 = RD_KAFKA_PARTITION_UA; const MsgFlags: Integer = RD_KAFKA_MSG_F_COPY; const MsgOpaque: Pointer = nil): Integer; overload;
-    class function Produce(const Topic: prd_kafka_topic_t; const Payloads: TArray<String>; const Key: String; const Partition: Int32 = RD_KAFKA_PARTITION_UA; const MsgFlags: Integer = RD_KAFKA_MSG_F_COPY; const MsgOpaque: Pointer = nil): Integer; overload;
-    class function Produce(const Topic: prd_kafka_topic_t; const Payloads: TArray<String>; const Key: String; const Encoding: TEncoding; const Partition: Int32 = RD_KAFKA_PARTITION_UA; const MsgFlags: Integer = RD_KAFKA_MSG_F_COPY; const MsgOpaque: Pointer = nil): Integer; overload;
+    class function Produce(const Topic: prd_kafka_topic_t; const Payloads: TStringArray; const Key: String; const Partition: Int32 = RD_KAFKA_PARTITION_UA; const MsgFlags: Integer = RD_KAFKA_MSG_F_COPY; const MsgOpaque: Pointer = nil): Integer; overload;
 
     class procedure Flush(const KafkaHandle: prd_kafka_t; const Timeout: Integer = 1000);
 
@@ -111,14 +106,14 @@ procedure ProducerCallBackLogger(rk: prd_kafka_t; rkmessage: prd_kafka_message_t
 begin
   if rkmessage <> nil then
   begin
-    TKafkaHelper.Log(format(StrMessageSendResult, [Integer(rkmessage.err)]), TKafkaLogType.kltProducer);
+    TKafkaHelper.Log(format(StrMessageSendResult, [Integer(rkmessage.err)]), kltProducer);
   end;
 end;
 
 procedure LogCallBackLogger(rk: prd_kafka_t; level: integer; fac: PAnsiChar;
   buf: PAnsiChar); cdecl;
 begin
-  TKafkaHelper.Log(format(StrLogCallBackFac, [String(fac), String(buf)]), TKafkaLogType.kltLog);
+  TKafkaHelper.Log(format(StrLogCallBackFac, [String(fac), String(buf)]), kltLog);
 end;
 
 procedure ErrorCallBackLogger(rk: prd_kafka_t; err: integer; reason: PAnsiChar;
@@ -131,6 +126,7 @@ end;
 
 constructor TOperationTimer.Create(const Operation: String);
 begin
+  FStopwatch := TCRMStopWatch.Create;
   Start(Operation);
 end;
 
@@ -139,13 +135,19 @@ begin
   Create(format(Operation, Args));
 end;
 
+destructor TOperationTimer.Destroy;
+begin
+  FreeAndNil(FStopwatch);
+  inherited;
+end;
+
 procedure TOperationTimer.Start(const Operation: String);
 begin
   Stop;
 
   FOperation := Operation;
 
-  TKafkaHelper.Log('Started - ' + FOperation, TKafkaLogType.kltDebug);
+  TKafkaHelper.Log('Started - ' + FOperation, kltDebug);
 
   FStopwatch.Start;
 end;
@@ -161,79 +163,114 @@ begin
   begin
     FStopwatch.Stop;
 
-    TKafkaHelper.Log('Finished - ' + FOperation + ' in ' + FStopwatch.ElapsedMilliseconds.ToString + 'ms', TKafkaLogType.kltDebug);
+    TKafkaHelper.Log(Format('Finished - %s in %d ms', [FOperation, FStopwatch.ElapsedMilliseconds]), kltDebug);
   end;
 end;
 
-class operator TOperationTimer.Finalize(var ADest: TOperationTimer);
+class procedure TOperationTimer.Finalize(var ADest: TOperationTimer);
 begin
   if ADest.FStopwatch.IsRunning then
   begin
     ADest.FStopwatch.Stop;
-
-    TKafkaHelper.Log('Finished - ' + ADest.FOperation + ' in ' + ADest.FStopwatch.ElapsedMilliseconds.ToString + 'ms', TKafkaLogType.kltDebug);
+    TKafkaHelper.Log(Format('Finished - %s in %d ms', [ADest.FOperation, ADest.FStopwatch.ElapsedMilliseconds]), kltDebug);
   end;
 end;
 
 { TKafkaUtils }
 
-class procedure TKafkaUtils.StringsToConfigArrays(const Values: TStrings; out NameArr, ValueArr: TArray<String>);
+class procedure TKafkaUtils.StringsToConfigArrays(const Values: TStrings; out NameArr, ValueArr: TStringArray);
 var
   i: Integer;
-  KeyValue: TArray<String>;
+  Key, Value: string;
+  EqualPos: Integer;
 begin
-  for i := 0 to pred(Values.Count) do
-  begin
-    if pos('=', Values[i]) <> 0 then
-    begin
-      KeyValue := Values[i].Split(['='], 2);
+  SetLength(NameArr, 0);
+  SetLength(ValueArr, 0);
 
-      NameArr := NameArr + [KeyValue[0]];
-      ValueArr := ValueArr + [KeyValue[1]];
+  for i := 0 to Values.Count - 1 do
+  begin
+    EqualPos := Pos('=', Values[i]);
+    if EqualPos > 0 then
+    begin
+      Key := Copy(Values[i], 1, EqualPos - 1);
+      Value := Copy(Values[i], EqualPos + 1, MaxInt);
+
+      SetLength(NameArr, Length(NameArr) + 1);
+      NameArr[High(NameArr)] := Key;
+
+      SetLength(ValueArr, Length(ValueArr) + 1);
+      ValueArr[High(ValueArr)] := Value;
     end;
   end;
 end;
 
-class function TKafkaUtils.StringsToIntegerArray(const Value: String): TArray<Integer>;
+class function TKafkaUtils.StringsToIntegerArray(const Value: String): TIntegerArray;
 var
-  StrArray: TArray<String>;
+  StrArray: TStringList;
   i: Integer;
 begin
-  StrArray := Value.Split([',']);
+  StrArray := TStringList.Create;
+  try
+    StrArray.CommaText := Value;  // Usa TStringList para dividir a string
+    SetLength(Result, StrArray.Count);
 
-  SetLength(Result, length(StrArray));
-
-  for i := Low(StrArray) to High(StrArray) do
-  begin
-    Result[i] := StrToInt(StrArray[i]);
+    for i := 0 to StrArray.Count - 1 do
+    begin
+      Result[i] := StrToInt(StrArray[i]);
+    end;
+  finally
+    StrArray.Free;
   end;
 end;
 
 class function TKafkaUtils.DateTimeToStrMS(const Value: TDateTime): String;
 begin
-  Result := DateTimeToStr(Value) + '.' + MilliSecondOf(Value).ToString.PadLeft(3, '0');
+  Result := DateTimeToStr(Value) + '.' + FormatFloat('000', MilliSecondOf(Value));
 end;
 
-class function TKafkaUtils.StrToBytes(const Value: String; const Encoding: TEncoding): TBytes;
+
+class function TKafkaUtils.StrToBytes(const Value: String): TBytes;
+var
+  UTF8Str: UTF8String;
+  i: Integer;
 begin
   if Value = '' then
-  begin
-    Result := [];
-  end
+    SetLength(Result, 0)
   else
   begin
-    Result := Encoding.GetBytes(Value);
+    UTF8Str := UTF8Encode(Value);;
+
+    SetLength(Result, Length(UTF8Str));
+    for i := 1 to Length(UTF8Str) do
+      Result[i - 1] := Byte(UTF8Str[i]);
   end;
 end;
 
-class function TKafkaUtils.PointerToStr(const Value: Pointer; const Len: Integer; const Encoding: TEncoding): String;
+class function TKafkaUtils.PointerToStr(const Value: Pointer; const Len: Integer): String;
 var
   Data: TBytes;
+  AnsiStr: AnsiString;
+//  UTF8Str: UTF8String;
 begin
   SetLength(Data, Len);
   Move(Value^, Pointer(Data)^, Len);
 
-  Result := Encoding.GetString(Data);
+//  case Encoding of
+//    etANSI:
+//      begin
+        SetString(AnsiStr, PAnsiChar(Value), Len);
+        Result := String(AnsiStr);
+(*/
+      end;
+    etUTF8:
+      begin
+        SetString(UTF8Str, PAnsiChar(Value), Len);
+        Result := UTF8Decode(UTF8Str);
+      end;
+    else
+      Result := '';
+  end;
+*)  
 end;
 
 class function TKafkaUtils.PointerToBytes(const Value: Pointer; const Len: Integer): TBytes;
@@ -255,24 +292,26 @@ begin
   rd_kafka_destroy(KafkaHandle);
 end;
 
-class constructor TKafkaHelper.Create;
-begin
-  FLogStrings := TStringList.Create;
-end;
-
-class destructor TKafkaHelper.Destroy;
-begin
-  FreeAndNil(FLogStrings);
-end;
-
 class procedure TKafkaHelper.DoLog(const Text: String; const LogType: TKafkaLogType);
 begin
-  TMonitor.Enter(TKafkaHelper.FLogStrings);
+  FCriticalSection.Enter;
   try
     TKafkaHelper.FLogStrings.AddObject(Text, TObject(LogType));
   finally
-    TMonitor.Exit(TKafkaHelper.FLogStrings);
+    FCriticalSection.Leave;
   end;
+end;
+
+class procedure TKafkaHelper.Initialize;
+begin
+  FLogStrings := TStringList.Create;
+  FCriticalSection := TCriticalSection.Create;
+end;
+
+class procedure TKafkaHelper.Finalize;
+begin
+  FreeAndNil(FLogStrings);
+  FreeAndNil(FCriticalSection);
 end;
 
 class procedure TKafkaHelper.Flush(const KafkaHandle: prd_kafka_t; const Timeout: Integer);
@@ -284,16 +323,14 @@ end;
 
 class procedure TKafkaHelper.FlushLogs;
 begin
-  TMonitor.Enter(TKafkaHelper.FLogStrings);
+  FCriticalSection.Enter;
   try
     if Assigned(FOnLog) then
-    begin
       FOnLog(TKafkaHelper.FLogStrings);
-    end;
 
     TKafkaHelper.FLogStrings.Clear;
   finally
-    TMonitor.Exit(TKafkaHelper.FLogStrings);
+    FCriticalSection.Leave;
   end;
 end;
 
@@ -312,7 +349,7 @@ begin
   rd_kafka_topic_conf_destroy(TopicConfiguration);
 end;
 
-class function TKafkaHelper.NewConfiguration(const Keys: TArray<String>; const Values: TArray<String>; const DefaultCallBacks: Boolean): prd_kafka_conf_t;
+class function TKafkaHelper.NewConfiguration(const Keys: TStringArray; const Values: TStringArray; const DefaultCallBacks: Boolean): prd_kafka_conf_t;
 var
   i: Integer;
 begin
@@ -336,7 +373,7 @@ begin
   end;
 end;
 
-class function TKafkaHelper.NewProducer(const ConfigKeys, ConfigValues: TArray<String>): prd_kafka_t;
+class function TKafkaHelper.NewProducer(const ConfigKeys, ConfigValues: TStringArray): prd_kafka_t;
 var
   Configuration: prd_kafka_conf_t;
 begin
@@ -379,7 +416,7 @@ begin
   end;
 end;
 
-class function TKafkaHelper.NewTopic(const KafkaHandle: prd_kafka_t; const TopicName: String; const TopicConfiguration: prd_kafka_topic_conf_t): prd_kafka_topic_t;
+class function TKafkaHelper.NewTopic(const KafkaHandle: prd_kafka_t; const TopicName: UTF8String; const TopicConfiguration: prd_kafka_topic_conf_t): prd_kafka_topic_t;
 begin
   Result := rd_kafka_topic_new(
     KafkaHandle,
@@ -393,11 +430,14 @@ begin
 end;
 
 class function TKafkaHelper.NewTopicConfiguration: prd_kafka_topic_conf_t;
+var
+  EmptyArray : TStringArray;
 begin
-  Result := NewTopicConfiguration([], []);
+  SetLength(EmptyArray, 0);
+  Result := NewTopicConfiguration(EmptyArray, EmptyArray);
 end;
 
-class procedure TKafkaHelper.CheckKeyValues(const Keys, Values: TArray<String>);
+class procedure TKafkaHelper.CheckKeyValues(const Keys, Values: TStringArray);
 begin
   if length(keys) <> length(values) then
   begin
@@ -405,7 +445,7 @@ begin
   end;
 end;
 
-class function TKafkaHelper.NewTopicConfiguration(const Keys, Values: TArray<String>): prd_kafka_topic_conf_t;
+class function TKafkaHelper.NewTopicConfiguration(const Keys, Values: TStringArray): prd_kafka_topic_conf_t;
 var
   i: Integer;
 begin
@@ -422,17 +462,15 @@ begin
   end;
 end;
 
-class function TKafkaHelper.Produce(const Topic: prd_kafka_topic_t; const Payloads: TArray<Pointer>; const PayloadLengths: TArray<Integer>; const Key: Pointer;
+class function TKafkaHelper.Produce(const Topic: prd_kafka_topic_t; const Payloads: TPointerArray; const PayloadLengths: TIntegerArray; const Key: Pointer;
   const KeyLen: NativeUInt; const Partition: Int32; const MsgFlags: Integer; const MsgOpaque: Pointer): Integer;
 var
   i: Integer;
-  Msgs: TArray<rd_kafka_message_t>;
+  Msgs: TArrayrd_kafka_message_t;
   Msg: rd_kafka_message_t;
 begin
   if length(Payloads) = 0 then
-  begin
-    Result := 0;
-  end
+    Result := 0
   else
   begin
     SetLength(Msgs, length(Payloads));
@@ -463,33 +501,26 @@ begin
   end;
 end;
 
-class function TKafkaHelper.Produce(const Topic: prd_kafka_topic_t; const Payloads: TArray<String>; const Key: String; const Encoding: TEncoding;
-  const Partition: Int32; const MsgFlags: Integer; const MsgOpaque: Pointer): Integer;
+class function TKafkaHelper.Produce(const Topic: prd_kafka_topic_t; const Payloads: TStringArray; const Key: String; const Partition: Int32; const MsgFlags: Integer; const MsgOpaque: Pointer): Integer;
 var
-  PayloadPointers: TArray<Pointer>;
-  PayloadLengths: TArray<Integer>;
+  PayloadPointers: TPointerArray;
+  PayloadLengths: TIntegerArray;
   KeyBytes, PayloadBytes: TBytes;
   i: Integer;
   KeyData: TBytes;
 begin
-  {$IFDEF DEBUG}var Timer := TOperationTimer.Create('Formatting %d messages', [Length(Payloads)]);{$ENDIF}
-
   SetLength(PayloadPointers, length(Payloads));
   SetLength(PayloadLengths, length(Payloads));
 
-  KeyData := TEncoding.UTF8.GetBytes(Key);
-
-  KeyBytes := TKafkaUtils.StrToBytes(Key, Encoding);
+  KeyBytes := TKafkaUtils.StrToBytes(Key);
 
   for i := Low(Payloads) to High(Payloads) do
   begin
-    PayloadBytes := TKafkaUtils.StrToBytes(Payloads[i], Encoding);
+    PayloadBytes := TKafkaUtils.StrToBytes(Payloads[i]);
 
     PayloadPointers[i] := @PayloadBytes[0];
     PayloadLengths[i] := Length(PayloadBytes);
   end;
-
-  {$IFDEF DEBUG}Timer.Start('Producing %d messages', [Length(Payloads)]);{$ENDIF}
 
   Result := Produce(
     Topic,
@@ -502,13 +533,12 @@ begin
     MsgOpaque);
 end;
 
-class function TKafkaHelper.Produce(const Topic: prd_kafka_topic_t; const Payload: String; const Key: String; const Encoding: TEncoding;
-  const Partition: Int32; const MsgFlags: Integer; const MsgOpaque: Pointer): Integer;
+class function TKafkaHelper.Produce(const Topic: prd_kafka_topic_t; const Payload: String; const Key: String; const Partition: Int32; const MsgFlags: Integer; const MsgOpaque: Pointer): Integer;
 var
   KeyBytes, PayloadBytes: TBytes;
 begin
-  KeyBytes := TKafkaUtils.StrToBytes(Key, TEncoding.UTF8);
-  PayloadBytes := TKafkaUtils.StrToBytes(Payload, TEncoding.UTF8);
+  KeyBytes := TKafkaUtils.StrToBytes(Key);
+  PayloadBytes := TKafkaUtils.StrToBytes(Payload);
 
   Result := Produce(
     Topic,
@@ -519,19 +549,6 @@ begin
     Partition,
     MsgFlags,
     MsgOpaque)
-end;
-
-class function TKafkaHelper.Produce(const Topic: prd_kafka_topic_t; const Payload: String; const Key: String; const Partition: Int32;
-  const MsgFlags: Integer; const MsgOpaque: Pointer): Integer;
-begin
-  Result := Produce(
-    Topic,
-    Payload,
-    Key,
-    TEncoding.UTF8,
-    Partition,
-    MsgFlags,
-    MsgOpaque);
 end;
 
 class function TKafkaHelper.Produce(const Topic: prd_kafka_topic_t; const Payload: Pointer; const PayloadLength: NativeUInt;
@@ -554,8 +571,10 @@ begin
 end;
 
 class function TKafkaHelper.NewConfiguration(const DefaultCallBacks: Boolean): prd_kafka_conf_t;
+var
+  EmptyArray : TStringArray;
 begin
-  Result := NewConfiguration([], [], DefaultCallBacks);
+  Result := NewConfiguration(EmptyArray, EmptyArray, DefaultCallBacks);
 end;
 
 class procedure TKafkaHelper.SetConfigurationValue(var Configuration: prd_kafka_conf_t; const Key, Value: String);
@@ -605,18 +624,10 @@ begin
     (Error <> RD_KAFKA_RESP_ERR__PARTITION_EOF);
 end;
 
-class function TKafkaHelper.Produce(const Topic: prd_kafka_topic_t; const Payloads: TArray<String>; const Key: String; const Partition: Int32;
-   const MsgFlags: Integer; const MsgOpaque: Pointer): Integer;
-begin
-  Result := Produce(
-    Topic,
-    Payloads,
-    Key,
-    TEncoding.UTF8,
-    Partition,
-    MsgFlags,
-    MsgOpaque);
-end;
+initialization
+  TKafkaHelper.Initialize;
 
+finalization
+  TKafkaHelper.Finalize;
 
 end.

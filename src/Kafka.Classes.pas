@@ -3,28 +3,23 @@ unit Kafka.Classes;
 interface
 
 uses
-  System.SysUtils, System.Classes, System.Generics.Collections, System.Threading, System.SyncObjs,
-
-  Kafka.Interfaces,
-  Kafka.Types,
-  Kafka.Helper,
-  Kafka.Lib;
+  CRM.Types, Windows, SysUtils, Classes, SyncObjs,  Kafka.Interfaces,  Kafka.Types,  Kafka.Helper,  Kafka.Lib;
 
 const
   ConsumerPollTimeout = 100;
 
 type
-  TConsumerMessageHandlerProc = reference to procedure(const Msg: prd_kafka_message_t);
+  TConsumerMessageHandlerProc = procedure(const Msg: prd_kafka_message_t) of object;
 
   TKafkaConsumerThreadBase = class(TThread)
   protected
     FKafkaHandle: prd_kafka_t;
     FConfiguration: prd_kafka_conf_t;
     FHandler: TConsumerMessageHandlerProc;
-    FTopics: TArray<String>;
-    FPartitions: TArray<Integer>;
+    FTopics: TStringArray;
+    FPartitions: TIntegerArray;
     FBrokers: String;
-    FConsumedCount: Int64;
+    FConsumedCount: Integer;
 
     procedure DoSetup; virtual; abstract;
     procedure DoExecute; virtual; abstract;
@@ -32,7 +27,7 @@ type
 
     procedure Execute; override;
   public
-    constructor Create(const Configuration: prd_kafka_conf_t; const Handler: TConsumerMessageHandlerProc; const Brokers: String; const Topics: TArray<String>; const Partitions: TArray<Integer>);
+    constructor Create(const Configuration: prd_kafka_conf_t; const Handler: TConsumerMessageHandlerProc; const Brokers: String; const Topics: TStringArray; const Partitions: TIntegerArray);
   end;
   TKafkaConsumerThreadClass = class of TKafkaConsumerThreadBase;
 
@@ -47,43 +42,41 @@ type
 
   TKafkaConsumer = class(TInterfacedObject, IKafkaConsumer)
   private
-    function GetConsumedCount: Int64;
+    function GetConsumedCount: Integer;
   protected
     FThread: TKafkaConsumerThreadBase;
 
     procedure DoNeedConsumerThreadClass(out Value: TKafkaConsumerThreadClass); virtual;
   public
-    constructor Create(const Configuration: prd_kafka_conf_t; const Handler: TConsumerMessageHandlerProc; const Brokers: String; const Topics: TArray<String>; const Partitions: TArray<Integer>);
+    constructor Create(const Configuration: prd_kafka_conf_t; const Handler: TConsumerMessageHandlerProc; const Brokers: String; const Topics: TStringArray; const Partitions: TIntegerArray);
     destructor Destroy; override;
 
     function GetConsumerThreadClass: TKafkaConsumerThreadClass;
 
-    property ConsumedCount: Int64 read GetConsumedCount;
+    property ConsumedCount: Integer read GetConsumedCount;
   end;
 
   TKafkaProducer = class(TInterfacedObject, IKafkaProducer)
   private
-    FProducedCount: Int64;
+    FProducedCount: Integer;
 
     function GetKafkaHandle: prd_kafka_t;
-    function GetProducedCount: Int64;
+    function GetProducedCount: Integer;
   protected
     FKafkaHandle: prd_kafka_t;
     FConfiguration: prd_kafka_conf_t;
   public
-    constructor Create(const ConfigurationKeys, ConfigurationValues: TArray<String>); overload;
+    constructor Create(const ConfigurationKeys, ConfigurationValues: TStringArray); overload;
     constructor Create(const Configuration: prd_kafka_conf_t); overload;
 
     destructor Destroy; override;
 
     function Produce(const Topic: String; const Payload: Pointer; const PayloadLength: NativeUInt; const Key: Pointer = nil; const KeyLen: NativeUInt = 0; const Partition: Int32 = RD_KAFKA_PARTITION_UA; const MsgFlags: Integer = RD_KAFKA_MSG_F_COPY; const MsgOpaque: Pointer = nil): Integer; overload;
-    function Produce(const Topic: String; const Payloads: TArray<Pointer>; const PayloadLengths: TArray<Integer>; const Key: Pointer = nil; const KeyLen: NativeUInt = 0; const Partition: Int32 = RD_KAFKA_PARTITION_UA; const MsgFlags: Integer = RD_KAFKA_MSG_F_COPY; const MsgOpaque: Pointer = nil): Integer; overload;
+    function Produce(const Topic: String; const Payloads: TPointerArray; const PayloadLengths: TIntegerArray; const Key: Pointer = nil; const KeyLen: NativeUInt = 0; const Partition: Int32 = RD_KAFKA_PARTITION_UA; const MsgFlags: Integer = RD_KAFKA_MSG_F_COPY; const MsgOpaque: Pointer = nil): Integer; overload;
     function Produce(const Topic: String; const Payload: String; const Key: String; const Partition: Int32 = RD_KAFKA_PARTITION_UA; const MsgFlags: Integer = RD_KAFKA_MSG_F_COPY; const MsgOpaque: Pointer = nil): Integer; overload;
-    function Produce(const Topic: String; const Payload: String; const Key: String; const Encoding: TEncoding; const Partition: Int32 = RD_KAFKA_PARTITION_UA; const MsgFlags: Integer = RD_KAFKA_MSG_F_COPY; const MsgOpaque: Pointer = nil): Integer; overload;
-    function Produce(const Topic: String; const Payloads: TArray<String>; const Key: String; const Partition: Int32 = RD_KAFKA_PARTITION_UA; const MsgFlags: Integer = RD_KAFKA_MSG_F_COPY; const MsgOpaque: Pointer = nil): Integer; overload;
-    function Produce(const Topic: String; const Payloads: TArray<String>; const Key: String; const Encoding: TEncoding; const Partition: Int32 = RD_KAFKA_PARTITION_UA; const MsgFlags: Integer = RD_KAFKA_MSG_F_COPY; const MsgOpaque: Pointer = nil): Integer; overload;
+    function Produce(const Topic: String; const Payloads: TStringArray; const Key: String; const Partition: Int32 = RD_KAFKA_PARTITION_UA; const MsgFlags: Integer = RD_KAFKA_MSG_F_COPY; const MsgOpaque: Pointer = nil): Integer; overload;
 
-    property ProducedCount: Int64 read GetProducedCount;
+    property ProducedCount: Integer read GetProducedCount;
     property KafkaHandle: prd_kafka_t read GetKafkaHandle;
   end;
 
@@ -124,7 +117,7 @@ begin
     if (Msg.err <> RD_KAFKA_RESP_ERR__PARTITION_EOF) and
        (Assigned(FHandler)) then
     begin
-      TInterlocked.Increment(FConsumedCount);
+      InterlockedIncrement(FConsumedCount);
 
       try
         FHandler(Msg);
@@ -136,7 +129,7 @@ begin
       except
         on e: Exception do
         begin
-          TKafkaHelper.Log('Exception in message callback - ' + e.Message, TKafkaLogType.kltError);
+          TKafkaHelper.Log('Exception in message callback - ' + e.Message, kltError);
         end;
       end;
     end;
@@ -177,7 +170,7 @@ end;
 { TKafkaConsumerThreadBase }
 
 constructor TKafkaConsumerThreadBase.Create(const Configuration: prd_kafka_conf_t; const Handler: TConsumerMessageHandlerProc; const Brokers: String;
-  const Topics: TArray<String>; const Partitions: TArray<Integer>);
+  const Topics: TStringArray; const Partitions: TIntegerArray);
 begin
   inherited Create(True);
 
@@ -205,14 +198,14 @@ begin
   except
     on e: Exception do
     begin
-      TKafkaHelper.Log(format('Critical exception: %s', [e.Message]), TKafkaLogType.kltError);
+      TKafkaHelper.Log(format('Critical exception: %s', [e.Message]), kltError);
     end;
   end;
 end;
 
 { TKafkaProducer }
 
-constructor TKafkaProducer.Create(const ConfigurationKeys, ConfigurationValues: TArray<String>);
+constructor TKafkaProducer.Create(const ConfigurationKeys, ConfigurationValues: TStringArray);
 var
   Configuration: prd_kafka_conf_t;
 begin
@@ -240,22 +233,9 @@ begin
   Result := FKafkaHandle;
 end;
 
-function TKafkaProducer.GetProducedCount: Int64;
+function TKafkaProducer.GetProducedCount: Integer;
 begin
-  TInterlocked.Exchange(Result, FProducedCount);
-end;
-
-function TKafkaProducer.Produce(const Topic: String; const Payload: String; const Key: String; const Partition: Int32; const MsgFlags: Integer;
-  const MsgOpaque: Pointer): Integer;
-begin
-  Result := Produce(
-    Topic,
-    Payload,
-    Key,
-    TEncoding.UTF8,
-    Partition,
-    MsgFlags,
-    MsgOpaque);
+  InterlockedExchange(Result, FProducedCount);
 end;
 
 function TKafkaProducer.Produce(const Topic: String; const Payload: Pointer; const PayloadLength: NativeUInt; const Key: Pointer; const KeyLen: NativeUInt;
@@ -278,13 +258,13 @@ begin
       MsgFlags,
       MsgOpaque);
 
-    TInterlocked.Increment(FProducedCount);
+    InterlockedIncrement(FProducedCount);
   finally
     rd_kafka_topic_destroy(KTopic);
   end;
 end;
 
-function TKafkaProducer.Produce(const Topic: String; const Payloads: TArray<Pointer>; const PayloadLengths: TArray<Integer>; const Key: Pointer; const KeyLen: NativeUInt;
+function TKafkaProducer.Produce(const Topic: String; const Payloads: TPointerArray; const PayloadLengths: TIntegerArray; const Key: Pointer; const KeyLen: NativeUInt;
   const Partition: Int32; const MsgFlags: Integer; const MsgOpaque: Pointer): Integer;
 var
   KTopic: prd_kafka_topic_t;
@@ -304,26 +284,13 @@ begin
       MsgFlags,
       MsgOpaque);
 
-    TInterlocked.Add(FProducedCount, Length(Payloads));
+    InterlockedExchangeAdd(FProducedCount, Length(Payloads));
   finally
     rd_kafka_topic_destroy(KTopic);
   end;
 end;
 
-function TKafkaProducer.Produce(const Topic: String; const Payloads: TArray<String>; const Key: String; const Partition: Int32;
-  const MsgFlags: Integer; const MsgOpaque: Pointer): Integer;
-begin
-  Result := Produce(
-    Topic,
-    Payloads,
-    Key,
-    TEncoding.UTF8,
-    Partition,
-    MsgFlags,
-    MsgOpaque);
-end;
-
-function TKafkaProducer.Produce(const Topic: String; const Payloads: TArray<String>; const Key: String; const Encoding: TEncoding; const Partition: Int32;
+function TKafkaProducer.Produce(const Topic: String; const Payloads: TStringArray; const Key: String; const Partition: Int32;
   const MsgFlags: Integer; const MsgOpaque: Pointer): Integer;
 var
   KTopic: prd_kafka_topic_t;
@@ -337,18 +304,17 @@ begin
       KTopic,
       Payloads,
       Key,
-      Encoding,
       Partition,
       MsgFlags,
       MsgOpaque);
 
-    TInterlocked.Add(FProducedCount, Length(Payloads));
+    InterlockedExchangeAdd(FProducedCount, Length(Payloads));
   finally
     rd_kafka_topic_destroy(KTopic);
   end;
 end;
 
-function TKafkaProducer.Produce(const Topic, Payload, Key: String; const Encoding: TEncoding; const Partition: Int32; const MsgFlags: Integer;
+function TKafkaProducer.Produce(const Topic, Payload, Key: String; const Partition: Int32; const MsgFlags: Integer;
   const MsgOpaque: Pointer): Integer;
 var
   KTopic: prd_kafka_topic_t;
@@ -362,12 +328,11 @@ begin
       KTopic,
       Payload,
       Key,
-      Encoding,
       Partition,
       MsgFlags,
       MsgOpaque);
 
-    TInterlocked.Increment(FProducedCount);
+    InterlockedIncrement(FProducedCount);
   finally
     rd_kafka_topic_destroy(KTopic);
   end;
@@ -375,7 +340,7 @@ end;
 
 { TKafkaConsumer }
 
-constructor TKafkaConsumer.Create(const Configuration: prd_kafka_conf_t; const Handler: TConsumerMessageHandlerProc; const Brokers: String; const Topics: TArray<String>; const Partitions: TArray<Integer>);
+constructor TKafkaConsumer.Create(const Configuration: prd_kafka_conf_t; const Handler: TConsumerMessageHandlerProc; const Brokers: String; const Topics: TStringArray; const Partitions: TIntegerArray);
 begin
   FThread := GetConsumerThreadClass.Create(
     Configuration,
@@ -385,7 +350,7 @@ begin
     Partitions);
 
   FThread.FreeOnTerminate := True;
-  FThread.Start;
+  FThread.Resume;
 end;
 
 destructor TKafkaConsumer.Destroy;
@@ -400,9 +365,9 @@ begin
   Value := TKafkaConsumerThread;
 end;
 
-function TKafkaConsumer.GetConsumedCount: Int64;
+function TKafkaConsumer.GetConsumedCount: Integer;
 begin
-  TInterlocked.Exchange(Result, FThread.FConsumedCount);
+  InterlockedExchange(Result, FThread.FConsumedCount);
 end;
 
 function TKafkaConsumer.GetConsumerThreadClass: TKafkaConsumerThreadClass;

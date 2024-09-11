@@ -3,6 +3,7 @@ unit Kafka.Factory;
 interface
 
 uses
+  CRM.Types,
   Kafka.Interfaces,
   Kafka.Types,
   Kafka.Classes,
@@ -12,19 +13,19 @@ uses
 type
   TKafkaFactory = class
   public
-    class function NewProducer(const ConfigurationKeys, ConfigurationValues: TArray<String>): IKafkaProducer; overload;
+    class function NewProducer(const ConfigurationKeys, ConfigurationValues: TStringArray): IKafkaProducer; overload;
     class function NewProducer(const Configuration: prd_kafka_conf_t): IKafkaProducer; overload;
 
-    class function NewConsumer(const Configuration: prd_kafka_conf_t; const Brokers: String; const Topics: TArray<String>; const Partitions: TArray<Integer>; const Handler: TConsumerMessageHandlerProc): IKafkaConsumer; overload; static;
-    class function NewConsumer(const ConfigKeys, ConfigValues, ConfigTopicKeys, ConfigTopicValues: TArray<String>; const Brokers: String; const Topics: TArray<String>; const Partitions: TArray<Integer>; const Handler: TConsumerMessageHandlerProc): IKafkaConsumer; overload; static;
+    class function NewConsumer(const Configuration: prd_kafka_conf_t; const Brokers: String; const Topics: TStringArray; const Partitions: TIntegerArray; const Handler: TConsumerMessageHandlerProc): IKafkaConsumer; overload; static;
+    class function NewConsumer(const ConfigKeys, ConfigValues, ConfigTopicKeys, ConfigTopicValues: TStringArray; const Brokers: String; const Topics: TStringArray; const Partitions: TIntegerArray; const Handler: TConsumerMessageHandlerProc): IKafkaConsumer; overload; static;
   end;
 
 implementation
 
 { TKafkaFactory }
 
-class function TKafkaFactory.NewConsumer(const ConfigKeys, ConfigValues, ConfigTopicKeys, ConfigTopicValues: TArray<String>; const Brokers: String;
-  const Topics: TArray<String>; const Partitions: TArray<Integer>; const Handler: TConsumerMessageHandlerProc): IKafkaConsumer;
+class function TKafkaFactory.NewConsumer(const ConfigKeys, ConfigValues, ConfigTopicKeys, ConfigTopicValues: TStringArray; const Brokers: String;
+  const Topics: TStringArray; const Partitions: TIntegerArray; const Handler: TConsumerMessageHandlerProc): IKafkaConsumer;
 var
   Configuration: prd_kafka_conf_t;
   TopicConfiguration: prd_kafka_topic_conf_t;
@@ -55,7 +56,7 @@ begin
   Result := TKafkaProducer.Create(Configuration);
 end;
 
-class function TKafkaFactory.NewProducer(const ConfigurationKeys, ConfigurationValues: TArray<String>): IKafkaProducer;
+class function TKafkaFactory.NewProducer(const ConfigurationKeys, ConfigurationValues: TStringArray): IKafkaProducer;
 var
   Configuration: prd_kafka_conf_t;
 begin
@@ -67,7 +68,7 @@ begin
 end;
 
 class function TKafkaFactory.NewConsumer(const Configuration: prd_kafka_conf_t; const Brokers: String;
-  const Topics: TArray<String>; const Partitions: TArray<Integer>; const Handler: TConsumerMessageHandlerProc): IKafkaConsumer;
+  const Topics: TStringArray; const Partitions: TIntegerArray; const Handler: TConsumerMessageHandlerProc): IKafkaConsumer;
 begin
   Result := TKafkaConsumer.Create(
     Configuration,

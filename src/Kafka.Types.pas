@@ -3,13 +3,13 @@ unit Kafka.Types;
 interface
 
 uses
-  System.SysUtils;
+  SysUtils;
 
 type
   PNativeUInt = ^NativeUInt;
   mode_t = LongWord;
 
-  TKafkaErrorArray= Array[0 .. 512] of AnsiChar;
+  TKafkaErrorArray = Array[0 .. 512] of AnsiChar;
 
   TKafkaLogType = (
     kltLog,
